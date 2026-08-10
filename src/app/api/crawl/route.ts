@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { chunkText } from "@/lib/chunk";
-import { headers } from "next/headers";
 
 export async function POST(req: Request) {
   try {
