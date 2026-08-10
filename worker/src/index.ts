@@ -193,7 +193,7 @@ app.get("/knowledge/settings", async (c) => {
   const { data } = await supabase
     .from("knowledge_settings")
     .select("*")
-    .eq("id", c.get("userId"))
+    .eq("user_id", c.get("userId"))
     .single();
   return c.json({
     settings: data || {
@@ -214,7 +214,7 @@ app.patch("/knowledge/settings", async (c) => {
   const body = await c.req.json();
   const { data, error } = await supabase
     .from("knowledge_settings")
-    .upsert({ id: c.get("userId"), ...body })
+    .upsert({ user_id: c.get("userId"), ...body }, { onConflict: 'user_id' })
     .select()
     .single();
   if (error) return c.json({ error: error.message }, 500);
