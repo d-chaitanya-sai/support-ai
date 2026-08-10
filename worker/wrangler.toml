@@ -1,0 +1,13 @@
+name = "supportai-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ALLOWED_ORIGIN = "*"
+
+
+
+# Add secrets via: npx wrangler secret put SUPABASE_URL
+# npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# npx wrangler secret put GROQ_API_KEY
