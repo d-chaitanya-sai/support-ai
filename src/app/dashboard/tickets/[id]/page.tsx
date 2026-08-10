@@ -354,20 +354,21 @@ export default function TicketDetailPage() {
                 </div>
               )}
             </ScrollArea>
-
-            <Separator className="my-3 shrink-0" />
-
-            <div className="w-full shrink-0 flex flex-col pt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-2 px-1"><Bot className="inline h-3.5 w-3.5 mr-1" /> AI Assistant</p>
-              <AiChatInterface ticket={ticket} onSuggestedReply={() => {}} />
-            </div>
           </CardContent>
         </Card>
 
         {/* Sidebar: one panel, sectioned with hairlines instead of stacked cards */}
         <Card className="flex flex-col min-h-0 border-l rounded-none ring-0 shadow-none">
-          <ScrollArea className="flex-1 min-h-0">
-            <CardContent className="p-0 divide-y divide-border/60">
+          <Tabs defaultValue="details" className="flex flex-col flex-1 min-h-0">
+            <div className="p-3 border-b border-border/60 shrink-0">
+              <TabsList className="w-full h-8 bg-muted/50">
+                <TabsTrigger value="details" className="flex-1 text-xs">Details</TabsTrigger>
+                <TabsTrigger value="ai" className="flex-1 text-xs"><Bot className="h-3.5 w-3.5 mr-1.5" /> AI Assistant</TabsTrigger>
+              </TabsList>
+            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <TabsContent value="details" className="m-0 border-none outline-none">
+                <CardContent className="p-0 divide-y divide-border/60">
             {/* Ticket details */}
             <div className="p-4">
               <p className="text-xs font-medium text-muted-foreground mb-1">Details</p>
@@ -487,8 +488,13 @@ export default function TicketDetailPage() {
                 ))
               )}
             </div>
-            </CardContent>
-          </ScrollArea>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="ai" className="m-0 border-none outline-none p-4 flex flex-col h-full min-h-[400px]">
+                <AiChatInterface ticket={ticket} onSuggestedReply={() => {}} />
+              </TabsContent>
+            </ScrollArea>
+          </Tabs>
         </Card>
       </div>
     </div>
