@@ -254,7 +254,7 @@ export function AiChatInterface({ ticket, onSuggestedReply }: AiChatInterfacePro
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-4">
+      <ScrollArea className="flex-1 min-h-0 px-4 py-4">
         {!hydrated ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
