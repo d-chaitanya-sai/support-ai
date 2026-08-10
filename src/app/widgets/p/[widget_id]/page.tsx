@@ -67,7 +67,6 @@ export default function WidgetChatPage() {
   const [showCsat, setShowCsat] = useState(false);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [ticketId, setTicketId] = useState<string | null>(null);
-  const [agentTyping, setAgentTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -137,42 +136,7 @@ export default function WidgetChatPage() {
       .catch((e) => console.error("Failed to load conversation", e));
   }, []);
 
-  // Listen for agent takeover messages (Realtime push)
-  useEffect(() => {
-    if (!widgetId || !consentAccepted || !ticketId) return;
-    const channel = supabase
-      .channel(`widget_${ticketId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "widget_messages", filter: `ticket_id=eq.${ticketId}` },
-        (payload) => {
-          const m = payload.new;
-          if (m.role === "assistant") setAgentTyping(true);
-          setMessages((prev) => {
-            if (prev.some((existing) => existing.id === m.id)) return prev;
-            const duplicateIndex = prev.findIndex((existing) =>
-              existing.role === m.role &&
-              existing.content === m.content &&
-              Math.abs(existing.createdAt - m.created_at) < 10000
-            );
-            if (duplicateIndex !== -1) {
-              const next = [...prev];
-              next[duplicateIndex] = { ...next[duplicateIndex], id: m.id, createdAt: m.created_at };
-              return next;
-            }
-            return [...prev, {
-              id: m.id,
-              role: m.role as "user" | "assistant" | "agent",
-              content: m.content,
-              type: m.type || "text",
-              createdAt: m.created_at,
-            }];
-          });
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [widgetId, ticketId, consentAccepted]);
+  // AI Mode only - removed agent realtime listener
 
   const acceptConsent = () => {
     setConsentAccepted(true);
@@ -250,7 +214,7 @@ export default function WidgetChatPage() {
       }
       if (data.ticketId) setLinkedTicketId(data.ticketId);
 
-      if (data.paused) return; // Agent is active, do not render an AI message.
+
 
       const aiMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -283,7 +247,6 @@ export default function WidgetChatPage() {
   };
 
   const senderLabel = (msg: ChatMessage) => {
-    if (msg.role === "agent") return "Agent • Human Agent";
     return "Support AI • AI Agent";
   };
 

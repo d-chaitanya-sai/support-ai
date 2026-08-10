@@ -52,18 +52,6 @@ widgetChat.post("/", async (c) => {
   }
 
   let currentTicketId = ticketId;
-  let isAgentActive = false;
-
-  if (currentTicketId) {
-    const { data: ticketCheck } = await supabase
-      .from("tickets")
-      .select("agent_active")
-      .eq("id", currentTicketId)
-      .single();
-    if (ticketCheck?.agent_active) {
-      isAgentActive = true;
-    }
-  }
 
   const now = Date.now();
   const isNewTicket = !currentTicketId;
@@ -97,20 +85,6 @@ widgetChat.post("/", async (c) => {
     if (newTicket) {
       currentTicketId = newTicket.id;
     }
-  }
-
-  if (isAgentActive) {
-    await supabase.from("widget_messages").insert([
-      {
-        widget_id: widgetId,
-        role: "user",
-        content: message,
-        type: "text",
-        ticket_id: currentTicketId,
-        created_at: now,
-      }
-    ]);
-    return c.json({ paused: true, ticketId: currentTicketId });
   }
 
   if (looksLikeJailbreak(message)) {
@@ -298,33 +272,6 @@ widgetChat.post("/", async (c) => {
     content: ch.content.slice(0, 100) + "...",
   }));
 
-  // Agent takeover: surface latest agent replies
-  let agentMessages: Array<{ content: string; createdAt: number }> = [];
-  if (widgetId) {
-    const { data: openTicket } = await supabase
-      .from("tickets")
-      .select("id")
-      .eq("widget_id", widgetId)
-      .eq("agent_active", true)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (openTicket) {
-      const since = now - 600000;
-      const { data: agentReplies } = await supabase
-        .from("ticket_replies")
-        .select("message, created_at, sender_name")
-        .eq("ticket_id", openTicket.id)
-        .gte("created_at", since)
-        .order("created_at", { ascending: true });
-      agentMessages = (agentReplies || []).map((r) => ({
-        content: r.message,
-        createdAt: r.created_at,
-      }));
-    }
-  }
-
   return c.json({
     type: responseType,
     message: cleanContent,
@@ -334,7 +281,6 @@ widgetChat.post("/", async (c) => {
     confidence,
     confidenceScore: Math.round(topSim * 100),
     latencyMs: elapsed,
-    agentMessages,
   });
 });
 
@@ -365,40 +311,7 @@ widgetChat.get("/messages/:widgetId", async (c) => {
 
 // GET /widget/chat/poll/:widgetId — agent takeover polling
 widgetChat.get("/poll/:widgetId", async (c) => {
-  const supabase = getSupabase(c.env);
-  const widgetId = c.req.param("widgetId");
-  const since = Number(c.req.query("since") || 0);
-
-  const { data: ticket } = await supabase
-    .from("tickets")
-    .select("id, agent_active, status")
-    .eq("widget_id", widgetId)
-    .eq("agent_active", true)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!ticket) {
-    return c.json({ agentActive: false, messages: [] });
-  }
-
-  const { data: msgs } = await supabase
-    .from("widget_messages")
-    .select("*")
-    .eq("ticket_id", ticket.id)
-    .gt("created_at", since)
-    .order("created_at", { ascending: true });
-
-  return c.json({
-    agentActive: true,
-    ticketId: ticket.id,
-    messages: (msgs || []).map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      createdAt: m.created_at,
-    })),
-  });
+  return c.json({ agentActive: false, messages: [] });
 });
 
 // GET /widget/chat/tickets/:widgetId - past tickets for this widget
