@@ -44,13 +44,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+      } else {
+        console.error("Worker returned error status:", res.status);
+        throw new Error("Worker sync failed");
       }
     } catch (e) {
       console.error("Failed to sync user:", e);
       // Fallback: construct user from session
       setUser({
         id: s.user.id,
-        name: s.user.user_metadata?.full_name || "User",
+        name: s.user.user_metadata?.full_name || s.user.email?.split("@")[0] || "User",
         email: s.user.email || "",
         photoUrl: s.user.user_metadata?.avatar_url || "",
         widgetId: s.user.id, // fallback
