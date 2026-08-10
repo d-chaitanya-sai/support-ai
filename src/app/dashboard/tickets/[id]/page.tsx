@@ -168,12 +168,6 @@ export default function TicketDetailPage() {
   const [similar, setSimilar] = useState<Ticket[]>([]);
   const [similarHint, setSimilarHint] = useState("");
   const [loading, setLoading] = useState(true);
-  const [reply, setReply] = useState("");
-  const [sending, setSending] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [tone, setTone] = useState<"default" | "shorter" | "friendly" | "professional">("professional");
-  const [scores, setScores] = useState<{ empathy: number; clarity: number; policyRisk: number; notes?: string } | null>(null);
-  const [translation, setTranslation] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!session || !id) return;
@@ -192,7 +186,6 @@ export default function TicketDetailPage() {
       setTimeline(cData.timeline || []);
       setSimilar(sData.similar || []);
       setSimilarHint(sData.hint || "");
-      if (tData.ticket?.aiSuggestedReply) setReply(tData.ticket.aiSuggestedReply);
     } catch {
       toast.error("Failed to load ticket");
       router.push("/dashboard/tickets");
@@ -278,114 +271,6 @@ export default function TicketDetailPage() {
     } else toast.error(data.error || "Update failed");
   };
 
-  const sendReply = async (fromAi = false) => {
-    if (!session || !ticket || !reply.trim()) return;
-    setSending(true);
-    try {
-      const res = await workerFetch(`/tickets/${ticket.id}/replies`, {
-        method: "POST",
-        token: session.access_token,
-        body: JSON.stringify({
-          message: reply.trim(),
-          senderId: user?.id,
-          senderName: user?.name || "Agent",
-          fromAi,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      setReply("");
-      setScores(null);
-      toast.success("Reply sent");
-      await load();
-    } catch {
-      toast.error("Failed to send reply");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const suggestReply = async () => {
-    if (!session || !ticket) return;
-    setAiBusy(true);
-    try {
-      const res = await workerFetch("/ai/suggest-reply", {
-        method: "POST",
-        token: session.access_token,
-        body: JSON.stringify({ ticketId: ticket.id, tone }),
-      });
-      const data = await res.json();
-      const text = data.replyTranslated || data.reply || "";
-      setReply(text);
-      if (ticket.language && ticket.language !== "en" && data.reply) {
-        setTranslation(data.reply);
-      }
-      toast.success("Draft ready");
-    } catch {
-      toast.error("Suggest reply failed");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
-  const summarize = async () => {
-    if (!session || !ticket) return;
-    setAiBusy(true);
-    try {
-      const res = await workerFetch("/ai/summarize", {
-        method: "POST",
-        token: session.access_token,
-        body: JSON.stringify({ ticketId: ticket.id }),
-      });
-      const data = await res.json();
-      const s = data.summary || {};
-      const text = [s.mainIssue, s.currentStatus, s.recommendation].filter(Boolean).join(" · ");
-      await patchTicket({ aiSummary: text || JSON.stringify(s) });
-    } catch {
-      toast.error("Summarize failed");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
-  const scoreReply = async () => {
-    if (!session || !reply.trim() || !ticket) return;
-    setAiBusy(true);
-    try {
-      const res = await workerFetch("/ai/score-reply", {
-        method: "POST",
-        token: session.access_token,
-        body: JSON.stringify({
-          reply,
-          ticketContext: `${ticket.title}\n${ticket.description}`,
-        }),
-      });
-      const data = await res.json();
-      setScores(data);
-    } catch {
-      toast.error("Score failed");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
-  const translateToEn = async () => {
-    if (!session || !reply.trim()) return;
-    setAiBusy(true);
-    try {
-      const res = await workerFetch("/ai/translate", {
-        method: "POST",
-        token: session.access_token,
-        body: JSON.stringify({ text: reply, targetLanguage: "en" }),
-      });
-      const data = await res.json();
-      setTranslation(data.translated);
-    } catch {
-      toast.error("Translate failed");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
   if (loading || !ticket) {
     return (
       <div className="max-w-7xl mx-auto space-y-4 p-2">
@@ -435,15 +320,6 @@ export default function TicketDetailPage() {
             {ticket.category && <span>{ticket.category}</span>}
           </div>
         </div>
-        <Button
-          variant={ticket.agentActive ? "default" : "outline"}
-          size="sm"
-          className="gap-1.5 shrink-0"
-          onClick={() => patchTicket({ agentActive: !ticket.agentActive })}
-        >
-          <Headphones className="h-3.5 w-3.5" />
-          {ticket.agentActive ? "Takeover on" : "Take over chat"}
-        </Button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6 flex-1 min-h-0">
@@ -481,88 +357,10 @@ export default function TicketDetailPage() {
 
             <Separator className="my-3 shrink-0" />
 
-            <Tabs defaultValue="reply" className="w-full shrink-0 flex flex-col">
-              <div className="flex justify-end mb-2 px-1">
-                <TabsList className="h-8 bg-transparent">
-                  <TabsTrigger value="reply" className="gap-1.5 text-xs data-[state=active]:bg-muted/50 data-[state=active]:shadow-none">
-                    <Headphones className="h-3.5 w-3.5" /> Reply
-                  </TabsTrigger>
-                  <TabsTrigger value="assist" className="gap-1.5 text-xs data-[state=active]:bg-muted/50 data-[state=active]:shadow-none">
-                    <Bot className="h-3.5 w-3.5" /> Assist
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="reply" className="mt-0 outline-none">
-                <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm focus-within:ring-1 focus-within:ring-ring transition-shadow flex flex-col gap-2">
-                  <Textarea
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Write your reply to the customer…"
-                    className="min-h-[60px] border-0 p-1 shadow-none focus-visible:ring-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground/70"
-                  />
-
-                  {translation && (
-                    <div className="text-xs rounded-lg border border-border/60 p-3 bg-muted/30 mx-1">
-                      <p className="font-medium mb-1 text-muted-foreground">English reference</p>
-                      <p className="whitespace-pre-wrap">{translation}</p>
-                    </div>
-                  )}
-
-                  {scores && (
-                    <div className="grid grid-cols-3 gap-3 text-xs mx-1">
-                      {[
-                        { label: "Empathy", value: scores.empathy },
-                        { label: "Clarity", value: scores.clarity },
-                        { label: "Policy risk", value: scores.policyRisk },
-                      ].map((s) => (
-                        <div key={s.label} className="space-y-1">
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>{s.label}</span>
-                            <span className="text-foreground font-medium">{s.value}</span>
-                          </div>
-                          <Progress value={s.value} className="h-1" />
-                        </div>
-                      ))}
-                      {scores.notes && <p className="col-span-3 text-muted-foreground">{scores.notes}</p>}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex flex-wrap gap-1">
-                      <Button variant="ghost" size="sm" onClick={suggestReply} disabled={aiBusy} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground rounded-full px-3">
-                        {aiBusy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5" />
-                        )}
-                        <span>Suggest</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={summarize} disabled={aiBusy} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground rounded-full px-3">
-                        <span className="font-serif italic font-bold">∑</span>
-                        <span>Summarize</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={scoreReply} disabled={aiBusy || !reply.trim()} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground rounded-full px-3">
-                        <CircleDot className="h-3.5 w-3.5" />
-                        <span>Score</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={translateToEn} disabled={aiBusy || !reply.trim()} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground rounded-full px-3">
-                        <Languages className="h-3.5 w-3.5" />
-                        <span>EN</span>
-                      </Button>
-                    </div>
-
-                    <Button onClick={() => sendReply(!!scores)} disabled={sending || !reply.trim()} size="icon" className="h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0">
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 ml-0.5" />}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="assist" className="mt-0 outline-none">
-                <AiChatInterface ticket={ticket} onSuggestedReply={setReply} />
-              </TabsContent>
-            </Tabs>
+            <div className="w-full shrink-0 flex flex-col pt-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2 px-1"><Bot className="inline h-3.5 w-3.5 mr-1" /> AI Assistant</p>
+              <AiChatInterface ticket={ticket} onSuggestedReply={() => {}} />
+            </div>
           </CardContent>
         </Card>
 
