@@ -490,7 +490,7 @@ export default function TicketDetailPage() {
             </div>
                 </CardContent>
               </TabsContent>
-              <TabsContent value="ai" className="m-0 border-none outline-none p-4 flex flex-col h-full min-h-[400px]">
+              <TabsContent value="ai" className="m-0 border-none outline-none flex flex-col h-full">
                 <AiChatInterface ticket={ticket} onSuggestedReply={() => {}} />
               </TabsContent>
             </ScrollArea>

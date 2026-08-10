@@ -235,10 +235,10 @@ export function AiChatInterface({ ticket, onSuggestedReply }: AiChatInterfacePro
   const lastIsAssistant = messages.length > 0 && messages[messages.length - 1].role === "assistant";
 
   return (
-    <div className="flex flex-col h-full min-h-[420px] bg-card/30 rounded-xl border border-border overflow-hidden">
-      <div className="p-4 border-b border-border bg-card/50 flex items-center justify-between shrink-0">
+    <div className="flex flex-col h-full min-h-0 bg-transparent overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/40 bg-muted/20 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-lg text-primary">
+          <div className="bg-indigo-500/10 p-2 rounded-lg text-indigo-600">
             <Bot className="h-5 w-5" />
           </div>
           <div>
@@ -260,22 +260,22 @@ export function AiChatInterface({ ticket, onSuggestedReply }: AiChatInterfacePro
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center space-y-4 py-6">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+          <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-500/10">
               <Sparkles className="h-7 w-7" />
             </div>
             <div>
-              <p className="text-sm font-medium">AI Support Assistant</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+              <p className="text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">AI Support Assistant</p>
+              <p className="text-xs text-muted-foreground mt-1.5 max-w-[200px]">
                 Ask me anything about this ticket — history is saved
               </p>
             </div>
-            <div className="w-full space-y-2 pt-2">
+            <div className="w-full space-y-2 pt-4">
               {SUGGESTED_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
-                  className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border bg-card/50 hover:bg-muted/50 hover:border-primary/30 transition-all text-muted-foreground hover:text-foreground"
+                  className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border/50 bg-background hover:bg-muted/50 hover:border-indigo-500/30 transition-all text-muted-foreground hover:text-foreground shadow-sm"
                 >
                   {prompt}
                 </button>
@@ -307,7 +307,7 @@ export function AiChatInterface({ ticket, onSuggestedReply }: AiChatInterfacePro
         </div>
       )}
 
-      <div className="p-4 bg-card/50 border-t border-border shrink-0">
+      <div className="p-4 border-t border-border/40 shrink-0 bg-muted/20">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={input}
