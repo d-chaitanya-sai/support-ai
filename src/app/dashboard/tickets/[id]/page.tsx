@@ -366,9 +366,10 @@ export default function TicketDetailPage() {
                 <TabsTrigger value="ai" className="flex-1 text-xs"><Bot className="h-3.5 w-3.5 mr-1.5" /> AI Assistant</TabsTrigger>
               </TabsList>
             </div>
-            <ScrollArea className="flex-1 min-h-0">
-              <TabsContent value="details" className="m-0 border-none outline-none">
-                <CardContent className="p-0 divide-y divide-border/60">
+            <div className="flex-1 min-h-0 relative">
+              <TabsContent value="details" className="m-0 border-none outline-none h-full absolute inset-0 data-[state=active]:block">
+                <ScrollArea className="h-full">
+                  <CardContent className="p-0 divide-y divide-border/60">
             {/* Ticket details */}
             <div className="p-4">
               <p className="text-xs font-medium text-muted-foreground mb-1">Details</p>
@@ -488,12 +489,13 @@ export default function TicketDetailPage() {
                 ))
               )}
             </div>
-                </CardContent>
+                  </CardContent>
+                </ScrollArea>
               </TabsContent>
-              <TabsContent value="ai" className="m-0 border-none outline-none flex flex-col h-full">
+              <TabsContent value="ai" className="m-0 border-none outline-none h-full absolute inset-0 data-[state=active]:flex flex-col">
                 <AiChatInterface ticket={ticket} onSuggestedReply={() => {}} />
               </TabsContent>
-            </ScrollArea>
+            </div>
           </Tabs>
         </Card>
       </div>
