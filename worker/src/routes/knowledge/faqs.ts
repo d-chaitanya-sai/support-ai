@@ -3,7 +3,8 @@ import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
 import { getGroq, MODEL } from "../../lib/groq";
 
-const faqs = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const faqs = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // GET /knowledge/faqs
 faqs.get("/", async (c) => {
@@ -12,6 +13,7 @@ faqs.get("/", async (c) => {
   let q = supabase
     .from("knowledge_faqs")
     .select("*")
+    .eq("user_id", c.get("userId"))
     .order("priority", { ascending: false })
     .order("created_at", { ascending: false });
   if (collectionId) q = q.eq("collection_id", collectionId);
@@ -32,6 +34,7 @@ faqs.post("/", async (c) => {
       collection_id: body.collectionId || null,
       tags: body.tags || [],
       priority: body.priority || 0,
+      user_id: c.get("userId"),
       created_at: Date.now(),
     })
     .select()
@@ -48,6 +51,7 @@ faqs.patch("/:id", async (c) => {
     .from("knowledge_faqs")
     .update(body)
     .eq("id", c.req.param("id"))
+    .eq("user_id", c.get("userId"))
     .select()
     .single();
   if (error) return c.json({ error: error.message }, 500);
@@ -60,7 +64,8 @@ faqs.delete("/:id", async (c) => {
   const { error } = await supabase
     .from("knowledge_faqs")
     .delete()
-    .eq("id", c.req.param("id"));
+    .eq("id", c.req.param("id"))
+    .eq("user_id", c.get("userId"));
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ success: true });
 });
@@ -74,8 +79,9 @@ faqs.post("/generate", async (c) => {
   if (body.documentId && !content) {
     const { data: chunks } = await supabase
       .from("knowledge_chunks")
-      .select("content")
+      .select("content, user_id")
       .eq("document_id", body.documentId)
+      .eq("user_id", c.get("userId"))
       .limit(10);
     content = (chunks || []).map((ch) => ch.content).join("\n\n");
   }
@@ -86,6 +92,7 @@ faqs.post("/generate", async (c) => {
     const { data: chunks } = await supabase
       .from("knowledge_chunks")
       .select("content")
+      .eq("user_id", c.get("userId"))
       .limit(40);
     content = (chunks || []).map((ch) => ch.content).join("\n\n");
   }
@@ -121,6 +128,7 @@ faqs.post("/generate", async (c) => {
         answer: f.answer,
         tags: f.tags || ["gap"],
         priority: f.priority || 1,
+        user_id: c.get("userId"),
         created_at: Date.now(),
       }));
       await supabase.from("knowledge_faqs").insert(rows);

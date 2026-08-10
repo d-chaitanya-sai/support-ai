@@ -4,7 +4,8 @@ import { getSupabase } from "../lib/supabase";
 import { analyzeTicket } from "../lib/ai-utils";
 import { redactPii } from "../lib/pii";
 
-const tickets = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const tickets = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // POST /tickets/bulk — bulk triage (must be before /:id)
 tickets.post("/bulk", async (c) => {
@@ -23,7 +24,7 @@ tickets.post("/bulk", async (c) => {
   if (body.priority) updates.priority = body.priority;
   if (body.urgency) updates.urgency = body.urgency;
 
-  const { data, error } = await supabase.from("tickets").update(updates).in("id", body.ids).select();
+  const { data, error } = await supabase.from("tickets").update(updates).in("id", body.ids).eq("owner_id", c.get("userId")).select();
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ tickets: (data || []).map(mapTicket) });
 });
@@ -34,6 +35,7 @@ tickets.get("/", async (c) => {
   const { data, error } = await supabase
     .from("tickets")
     .select("*")
+    .eq("owner_id", c.get("userId"))
     .order("created_at", { ascending: false });
 
   if (error) return c.json({ error: error.message }, 500);
@@ -57,6 +59,10 @@ tickets.get("/", async (c) => {
 tickets.get("/:id/conversation", async (c) => {
   const supabase = getSupabase(c.env);
   const id = c.req.param("id");
+  const { data: ticket } = await supabase.from("tickets").select("owner_id").eq("id", id).single();
+  if (ticket?.owner_id !== c.get("userId")) {
+    return c.json({ error: "Not found or unauthorized" }, 404);
+  }
 
   const [widgetRes, repliesRes] = await Promise.all([
     supabase
@@ -128,6 +134,9 @@ tickets.get("/:id/conversation", async (c) => {
 // GET /tickets/:id/assist
 tickets.get("/:id/assist", async (c) => {
   const supabase = getSupabase(c.env);
+  const { data: ticket } = await supabase.from("tickets").select("owner_id").eq("id", c.req.param("id")).single();
+  if (ticket?.owner_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
+
   const { data, error } = await supabase
     .from("ticket_assist_messages")
     .select("*")
@@ -156,6 +165,9 @@ tickets.post("/:id/assist", async (c) => {
   }>();
 
   const ticketId = c.req.param("id");
+  const { data: ticket } = await supabase.from("tickets").select("owner_id").eq("id", ticketId).single();
+  if (ticket?.owner_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
+
   const rows = body.messages?.length
     ? body.messages.map((m) => ({
         ticket_id: ticketId,
@@ -183,13 +195,14 @@ tickets.post("/:id/assist", async (c) => {
 tickets.get("/:id/similar", async (c) => {
   const supabase = getSupabase(c.env);
   const id = c.req.param("id");
-  const { data: ticket } = await supabase.from("tickets").select("*").eq("id", id).single();
+  const { data: ticket } = await supabase.from("tickets").select("*").eq("id", id).eq("owner_id", c.get("userId")).single();
   if (!ticket) return c.json({ error: "Not found" }, 404);
 
   const { data } = await supabase
     .from("tickets")
     .select("*")
     .neq("id", id)
+    .eq("owner_id", c.get("userId"))
     .or(`category.eq.${ticket.category},intent.eq.${ticket.intent || "General"}`)
     .order("created_at", { ascending: false })
     .limit(5);
@@ -210,6 +223,7 @@ tickets.get("/:id", async (c) => {
     .from("tickets")
     .select("*")
     .eq("id", c.req.param("id"))
+    .eq("owner_id", c.get("userId"))
     .single();
 
   if (error || !data) return c.json({ error: "Not found" }, 404);
@@ -231,7 +245,7 @@ tickets.post("/", async (c) => {
     console.error("Analysis failed:", e);
   }
 
-  let ownerId = body.ownerId || null;
+  let ownerId = c.get("userId") || body.ownerId || null;
 
   if (!ownerId && body.widgetId) {
     const { data: owner } = await supabase
@@ -329,6 +343,7 @@ tickets.patch("/:id", async (c) => {
     .from("tickets")
     .update(allowed)
     .eq("id", c.req.param("id"))
+    .eq("owner_id", c.get("userId"))
     .select()
     .single();
 
@@ -339,6 +354,9 @@ tickets.patch("/:id", async (c) => {
 // GET /tickets/:id/replies
 tickets.get("/:id/replies", async (c) => {
   const supabase = getSupabase(c.env);
+  const { data: ticket } = await supabase.from("tickets").select("owner_id").eq("id", c.req.param("id")).single();
+  if (ticket?.owner_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
+
   const { data, error } = await supabase
     .from("ticket_replies")
     .select("*")
@@ -356,13 +374,16 @@ tickets.post("/:id/replies", async (c) => {
 
   const reply = {
     ticket_id: c.req.param("id"),
-    sender_id: body.senderId || null,
+    sender_id: c.get("userId") || body.senderId || null,
     sender_name: body.senderName || "Agent",
     message: redactPii(body.message || ""),
     message_en: body.messageEn || body.message,
     language: body.language || "en",
     created_at: Date.now(),
   };
+
+  const { data: checkTicket } = await supabase.from("tickets").select("owner_id").eq("id", c.req.param("id")).single();
+  if (checkTicket?.owner_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
 
   const { data, error } = await supabase.from("ticket_replies").insert(reply).select().single();
 

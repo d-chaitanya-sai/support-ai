@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
 
-const collections = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const collections = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 const ICONS = ["📚", "💡", "🔧", "💰", "⚖️", "🛍️", "🌐", "🔒"];
 const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"];
@@ -13,6 +14,7 @@ collections.get("/", async (c) => {
   const { data, error } = await supabase
     .from("knowledge_collections")
     .select("*, knowledge_documents(count)")
+    .eq("user_id", c.get("userId"))
     .order("created_at", { ascending: false });
 
   if (error) return c.json({ error: error.message }, 500);
@@ -47,6 +49,7 @@ collections.post("/", async (c) => {
       description: body.description || "",
       color: body.color || COLORS[idx],
       icon: body.icon || ICONS[idx],
+      user_id: c.get("userId"),
       created_at: Date.now(),
     })
     .select()
@@ -64,6 +67,7 @@ collections.patch("/:id", async (c) => {
     .from("knowledge_collections")
     .update(body)
     .eq("id", c.req.param("id"))
+    .eq("user_id", c.get("userId"))
     .select()
     .single();
   if (error) return c.json({ error: error.message }, 500);
@@ -76,7 +80,8 @@ collections.delete("/:id", async (c) => {
   const { error } = await supabase
     .from("knowledge_collections")
     .delete()
-    .eq("id", c.req.param("id"));
+    .eq("id", c.req.param("id"))
+    .eq("user_id", c.get("userId"));
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ success: true });
 });

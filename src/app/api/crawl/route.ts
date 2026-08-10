@@ -52,7 +52,7 @@ export async function POST(req: Request) {
           const linkRegex = /\[[^\]]*\]\(([^)]+)\)/g;
           let match;
           while ((match = linkRegex.exec(text)) !== null) {
-            let linkUrl = match[1];
+            let linkUrl = match[1].split(" ")[0]; // Handle url "title" format
             if (linkUrl.startsWith("/") || linkUrl.startsWith(url)) {
               try {
                 const absoluteUrl = new URL(linkUrl, currentUrl).href;

@@ -3,7 +3,8 @@ import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
 import { getGroq, MODEL } from "../../lib/groq";
 
-const docs = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const docs = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // GET /knowledge/documents
 docs.get("/", async (c) => {
@@ -13,6 +14,7 @@ docs.get("/", async (c) => {
   let q = supabase
     .from("knowledge_documents")
     .select(`*, knowledge_collections(name, color, icon)`)
+    .eq("user_id", c.get("userId"))
     .order("created_at", { ascending: false });
 
   if (collectionId) q = q.eq("collection_id", collectionId);
@@ -72,6 +74,7 @@ docs.post("/", async (c) => {
       chunk_count: body.chunks.length,
       embedding_count: body.chunks.length,
       metadata: body.metadata || {},
+      user_id: c.get("userId"),
       created_at: now,
       updated_at: now,
     })
@@ -89,6 +92,7 @@ docs.post("/", async (c) => {
       token_count: chunk.tokenCount,
       embedding: chunk.embedding,
       metadata: {},
+      user_id: c.get("userId"),
     }));
 
     const { error: chunkErr } = await supabase.from("knowledge_chunks").insert(chunkInserts);
@@ -140,6 +144,9 @@ docs.post("/", async (c) => {
 docs.delete("/:id", async (c) => {
   const supabase = getSupabase(c.env);
   const id = c.req.param("id");
+  const { data: doc } = await supabase.from("knowledge_documents").select("user_id").eq("id", id).single();
+  if (doc?.user_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
+
   await supabase.from("knowledge_chunks").delete().eq("document_id", id);
   const { error } = await supabase.from("knowledge_documents").delete().eq("id", id);
   if (error) return c.json({ error: error.message }, 500);
@@ -158,6 +165,7 @@ docs.get("/:id", async (c) => {
     .from("knowledge_documents")
     .select("*")
     .eq("id", c.req.param("id"))
+    .eq("user_id", c.get("userId"))
     .single();
 
   if (error || !data) return c.json({ error: "Not found" }, 404);
@@ -167,10 +175,14 @@ docs.get("/:id", async (c) => {
 // GET /knowledge/documents/:id/chunks
 docs.get("/:id/chunks", async (c) => {
   const supabase = getSupabase(c.env);
+  const id = c.req.param("id");
+  const { data: doc } = await supabase.from("knowledge_documents").select("user_id").eq("id", id).single();
+  if (doc?.user_id !== c.get("userId")) return c.json({ error: "Not found" }, 404);
+
   const { data, error } = await supabase
     .from("knowledge_chunks")
     .select("id, chunk_index, content, token_count")
-    .eq("document_id", c.req.param("id"))
+    .eq("document_id", id)
     .order("chunk_index");
 
   if (error) return c.json({ error: error.message }, 500);

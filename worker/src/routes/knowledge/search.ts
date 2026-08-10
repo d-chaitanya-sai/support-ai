@@ -4,7 +4,8 @@ import { getSupabase } from "../../lib/supabase";
 import { buildRagContext } from "../../lib/ai-utils";
 import { getGroq, MODEL } from "../../lib/groq";
 
-const search = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const search = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // POST /knowledge/search - semantic search (playground)
 search.post("/", async (c) => {
@@ -26,16 +27,24 @@ search.post("/", async (c) => {
   // 1. Embed query (already done by client)
   const embedTime = 0;
 
-  // 2. Vector search
   const { data: chunks, error } = await supabase.rpc("match_knowledge_chunks", {
     query_embedding: embedding,
-    match_count: topK,
+    match_count: 50,
     similarity_threshold: threshold,
   });
 
   if (error) return c.json({ error: error.message }, 500);
 
-  const results = (chunks || []).map((ch: Record<string, unknown>) => ({
+  const { data: allowedChunks } = await supabase
+    .from("knowledge_chunks")
+    .select("id")
+    .eq("user_id", c.get("userId"))
+    .in("id", (chunks || []).map((c: any) => c.id));
+    
+  const allowedSet = new Set((allowedChunks || []).map(c => c.id));
+  const filteredChunks = (chunks || []).filter((c: any) => allowedSet.has(c.id)).slice(0, topK);
+
+  const results = filteredChunks.map((ch: Record<string, unknown>) => ({
     id: ch.id,
     chunkIndex: ch.chunk_index,
     content: ch.content,
@@ -86,6 +95,7 @@ Question: ${query}`;
       retrieved_chunks: results.length,
       response_time: totalTime,
       tokens: tokensUsed,
+      user_id: c.get("userId"),
       created_at: Date.now(),
     });
   } catch {}
@@ -123,6 +133,7 @@ search.get("/logs", async (c) => {
   const { data, error } = await supabase
     .from("knowledge_search_logs")
     .select("*")
+    .eq("user_id", c.get("userId"))
     .order("created_at", { ascending: false })
     .limit(limit);
 

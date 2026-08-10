@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
 
-const crawler = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const crawler = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // POST /knowledge/crawl - save crawled data
 crawler.post("/", async (c) => {
@@ -39,6 +40,7 @@ crawler.post("/", async (c) => {
       pages_found: pagesFound,
       pages_processed: pagesProcessed,
       options: body.options || {},
+      user_id: c.get("userId"),
       started_at: now,
       completed_at: now,
       created_at: now,
@@ -61,6 +63,7 @@ crawler.post("/", async (c) => {
       embedding_count: body.chunks.length,
       token_count: body.chunks.reduce((acc, ch) => acc + ch.tokenCount, 0),
       metadata: { job_id: job.id },
+      user_id: c.get("userId"),
       created_at: now,
       updated_at: now,
     })
@@ -77,6 +80,7 @@ crawler.post("/", async (c) => {
     token_count: chunk.tokenCount,
     embedding: chunk.embedding,
     metadata: { source_url: body.url },
+    user_id: c.get("userId"),
   }));
 
   const { error: chunkErr } = await supabase.from("knowledge_chunks").insert(chunkInserts);

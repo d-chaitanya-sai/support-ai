@@ -51,6 +51,16 @@ widgetChat.post("/", async (c) => {
     return c.json({ error: "widgetId and message required" }, 400);
   }
 
+  const { data: owner } = await supabase
+    .from("users")
+    .select("id")
+    .eq("widget_id", widgetId)
+    .single();
+  const widgetUserId = owner?.id;
+  if (!widgetUserId) {
+    return c.json({ error: "Invalid widget ID" }, 400);
+  }
+
   let currentTicketId = ticketId;
 
   const now = Date.now();
@@ -58,13 +68,7 @@ widgetChat.post("/", async (c) => {
 
   if (isNewTicket) {
     const safeTitle = redactPii(message).substring(0, 50) + "...";
-    let ownerId = null;
-    const { data: owner } = await supabase
-      .from("users")
-      .select("id")
-      .eq("widget_id", widgetId)
-      .single();
-    if (owner) ownerId = owner.id;
+    let ownerId = widgetUserId;
 
     const { data: newTicket } = await supabase
       .from("tickets")
@@ -143,14 +147,14 @@ widgetChat.post("/", async (c) => {
 
     let query = supabase.rpc("match_knowledge_chunks", {
       query_embedding: embedding,
-      match_count: 5,
+      match_count: 50,
       similarity_threshold: 0.2,
     });
 
     if (collectionIds?.length) {
       query = supabase.rpc("match_knowledge_chunks_filtered", {
         query_embedding: embedding,
-        match_count: 5,
+        match_count: 50,
         similarity_threshold: 0.2,
         collection_filter: collectionIds,
       });
@@ -158,8 +162,18 @@ widgetChat.post("/", async (c) => {
 
     const { data: chunks } = await query;
     if (chunks?.length) {
-      retrievedChunks = chunks;
-      ragContext = `\n\nCOMPANY KNOWLEDGE BASE:\n${buildRagContext(chunks)}\n\nUse the above context to answer the user's question when relevant.`;
+      const { data: allowedChunks } = await supabase
+        .from("knowledge_chunks")
+        .select("id")
+        .eq("user_id", widgetUserId)
+        .in("id", chunks.map((c: any) => c.id));
+        
+      const allowedSet = new Set((allowedChunks || []).map(c => c.id));
+      retrievedChunks = chunks.filter((c: any) => allowedSet.has(c.id)).slice(0, 5);
+      
+      if (retrievedChunks.length > 0) {
+        ragContext = `\n\nCOMPANY KNOWLEDGE BASE:\n${buildRagContext(retrievedChunks)}\n\nUse the above context to answer the user's question when relevant.`;
+      }
     }
   } catch (e) {
     console.error("RAG failed:", e);
@@ -252,6 +266,7 @@ widgetChat.post("/", async (c) => {
       retrieved_chunks: retrievedChunks.length,
       response_time: elapsed,
       tokens: completion.usage?.total_tokens || 0,
+      user_id: widgetUserId,
       created_at: nowAfterAI,
     });
   } else {
@@ -261,6 +276,7 @@ widgetChat.post("/", async (c) => {
       retrieved_chunks: 0,
       response_time: elapsed,
       tokens: completion.usage?.total_tokens || 0,
+      user_id: widgetUserId,
       created_at: nowAfterAI,
     });
   }

@@ -29,7 +29,11 @@ export interface Env {
   };
 }
 
-const app = new Hono<{ Bindings: Env }>();
+type Variables = {
+  userId: string;
+};
+
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Middleware
 app.use("*", logger());
@@ -50,6 +54,35 @@ app.use(
     maxAge: 86400,
   })
 );
+
+// Auth Middleware
+app.use("*", async (c, next) => {
+  // Public routes that don't need user context
+  const publicPaths = ["/", "/health", "/auth/sync-user", "/widget/chat", "/widget/chat/messages", "/widget/chat/tickets", "/widget/chat/poll"];
+  const path = new URL(c.req.url).pathname;
+  
+  if (publicPaths.some(p => path === p || path.startsWith(p + "/"))) {
+    return next();
+  }
+
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return c.json({ error: "Unauthorized: Missing or invalid Authorization header" }, 401);
+  }
+
+  const token = authHeader.substring(7);
+  const { getSupabase } = await import("./lib/supabase");
+  const supabase = getSupabase(c.env);
+  
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  
+  if (error || !user) {
+    return c.json({ error: "Unauthorized: Invalid token" }, 401);
+  }
+
+  c.set("userId", user.id);
+  await next();
+});
 
 // Health
 app.get("/", (c) => c.json({ status: "ok", service: "SupportAI Worker", version: "1.0.0" }));
