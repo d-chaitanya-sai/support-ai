@@ -13,10 +13,15 @@ export async function POST(req: Request) {
       );
     }
 
+    const authHeader = req.headers.get("Authorization");
+
     const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "http://localhost:8787";
     const res = await fetch(`${workerUrl}/ai/embed`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": authHeader || "",
+      },
       body: JSON.stringify({ text }),
     });
 

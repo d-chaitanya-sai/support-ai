@@ -90,29 +90,29 @@ export async function POST(req: Request) {
     }
     const embeddedChunks = [];
 
-    // 4. Generate Embeddings (calling our own local route internally)
-    // In server components/routes, it's faster to just import the singleton if we wanted,
-    // but fetching our own API route is simple enough since it runs on the same process in dev/vercel.
-    // Actually, calling an absolute URL in Next.js API route is tricky without knowing the host.
-    // Let's use the local import directly to save HTTP overhead.
-    const { pipeline } = await import("@xenova/transformers");
-    // We recreate the singleton locally for this file
-    if (!(globalThis as any)._embedder_promise) {
-      (globalThis as any)._embedder_promise = pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-    }
-    const embedder = await (globalThis as any)._embedder_promise;
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "http://localhost:8787";
 
     for (const chunk of chunks) {
-      const output = await embedder(chunk, { pooling: "mean", normalize: true });
+      const res = await fetch(`${workerUrl}/ai/embed`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": authHeader || "",
+        },
+        body: JSON.stringify({ text: chunk }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to generate embedding for chunk");
+      }
+      const data = await res.json();
       embeddedChunks.push({
         content: chunk,
-        embedding: Array.from(output.data),
+        embedding: data.embedding,
         tokenCount: Math.ceil(chunk.length / 4),
       });
     }
 
     // 5. Send to worker API (crawler endpoint)
-    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "http://localhost:8787";
     const workerRes = await fetch(`${workerUrl}/knowledge/crawl`, {
       method: "POST",
       headers: {

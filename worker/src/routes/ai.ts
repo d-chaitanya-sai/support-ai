@@ -4,7 +4,8 @@ import { getSupabase } from "../lib/supabase";
 import { getGroq, MODEL } from "../lib/groq";
 import { translateText } from "../lib/ai-utils";
 
-const aiRoutes = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // POST /ai/suggest-reply
 aiRoutes.post("/suggest-reply", async (c) => {
@@ -19,6 +20,7 @@ aiRoutes.post("/suggest-reply", async (c) => {
     .from("tickets")
     .select("*")
     .eq("id", body.ticketId)
+    .eq("owner_id", c.get("userId"))
     .single();
 
   if (!ticket) return c.json({ error: "Ticket not found" }, 404);
@@ -124,7 +126,7 @@ aiRoutes.post("/assist-chat", async (c) => {
     history?: Array<{ role: string; content: string }>;
   }>();
 
-  const { data: ticket } = await supabase.from("tickets").select("*").eq("id", body.ticketId).single();
+  const { data: ticket } = await supabase.from("tickets").select("*").eq("id", body.ticketId).eq("owner_id", c.get("userId")).single();
   if (!ticket) return c.json({ error: "Ticket not found" }, 404);
 
   const { data: replies } = await supabase
@@ -194,6 +196,7 @@ aiRoutes.post("/summarize", async (c) => {
     .from("tickets")
     .select("*")
     .eq("id", ticketId)
+    .eq("owner_id", c.get("userId"))
     .single();
 
   if (!ticket) return c.json({ error: "Not found" }, 404);

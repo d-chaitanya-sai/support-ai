@@ -107,13 +107,14 @@ app.get("/knowledge/stats", async (c) => {
   const supabase = getSupabase(c.env);
 
   const [docs, chunks, collections, faqs, crawls, logs] = await Promise.all([
-    supabase.from("knowledge_documents").select("id, status, type", { count: "exact" }),
-    supabase.from("knowledge_chunks").select("id", { count: "exact" }),
-    supabase.from("knowledge_collections").select("id", { count: "exact" }),
-    supabase.from("knowledge_faqs").select("id", { count: "exact" }),
-    supabase.from("crawl_jobs").select("id, status"),
+    supabase.from("knowledge_documents").select("id, status, type", { count: "exact" }).eq("user_id", c.get("userId")),
+    supabase.from("knowledge_chunks").select("id", { count: "exact" }).eq("user_id", c.get("userId")),
+    supabase.from("knowledge_collections").select("id", { count: "exact" }).eq("user_id", c.get("userId")),
+    supabase.from("knowledge_faqs").select("id", { count: "exact" }).eq("user_id", c.get("userId")),
+    supabase.from("crawl_jobs").select("id, status").eq("user_id", c.get("userId")),
     supabase.from("knowledge_search_logs")
       .select("response_time, retrieved_chunks, created_at")
+      .eq("user_id", c.get("userId"))
       .gte("created_at", Date.now() - 86400000), // last 24h
   ]);
 
@@ -143,9 +144,18 @@ app.get("/audit", async (c) => {
   const { getSupabase } = await import("./lib/supabase");
   const supabase = getSupabase(c.env);
   const limit = parseInt(c.req.query("limit") || "50");
+  
+  const { data: tickets } = await supabase.from("tickets").select("id").eq("owner_id", c.get("userId"));
+  const ticketIds = (tickets || []).map(t => t.id);
+
+  if (ticketIds.length === 0) {
+    return c.json({ logs: [] });
+  }
+
   const { data, error } = await supabase
     .from("ai_audit_log")
     .select("*, tickets(title)")
+    .in("ticket_id", ticketIds)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) return c.json({ error: error.message }, 500);
@@ -169,6 +179,7 @@ app.get("/knowledge/queue", async (c) => {
   const { data, error } = await supabase
     .from("processing_queue")
     .select("*, knowledge_documents(title, type)")
+    .eq("user_id", c.get("userId"))
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) return c.json({ error: error.message }, 500);
@@ -182,6 +193,7 @@ app.get("/knowledge/settings", async (c) => {
   const { data } = await supabase
     .from("knowledge_settings")
     .select("*")
+    .eq("id", c.get("userId"))
     .single();
   return c.json({
     settings: data || {
@@ -202,7 +214,7 @@ app.patch("/knowledge/settings", async (c) => {
   const body = await c.req.json();
   const { data, error } = await supabase
     .from("knowledge_settings")
-    .upsert({ id: 1, ...body })
+    .upsert({ id: c.get("userId"), ...body })
     .select()
     .single();
   if (error) return c.json({ error: error.message }, 500);

@@ -2,21 +2,32 @@ import { Hono } from "hono";
 import type { Env } from "../index";
 import { getSupabase } from "../lib/supabase";
 
-const analytics = new Hono<{ Bindings: Env }>();
+type Variables = { userId: string };
+const analytics = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 analytics.get("/", async (c) => {
   const supabase = getSupabase(c.env);
 
-  const [ticketsRes, logsRes, repliesRes, assistRes] = await Promise.all([
-    supabase.from("tickets").select("id, status, category, sentiment, urgency, language, csat, created_at, updated_at, tags"),
-    supabase.from("knowledge_search_logs").select("query, retrieved_chunks, response_time, created_at").order("created_at", { ascending: false }).limit(500),
-    supabase.from("ticket_replies").select("id, ticket_id, sender_name, created_at"),
-    supabase.from("ticket_assist_messages").select("id, ticket_id"),
+  const [ticketsRes, logsRes] = await Promise.all([
+    supabase.from("tickets").select("id, status, category, sentiment, urgency, language, csat, created_at, updated_at, tags").eq("owner_id", c.get("userId")),
+    supabase.from("knowledge_search_logs").select("query, retrieved_chunks, response_time, created_at").eq("user_id", c.get("userId")).order("created_at", { ascending: false }).limit(500),
   ]);
 
   const tickets = ticketsRes.data || [];
   const logs = logsRes.data || [];
-  const replies = repliesRes.data || [];
+  const ticketIds = tickets.map(t => t.id);
+
+  let replies: any[] = [];
+  let assists: any[] = [];
+
+  if (ticketIds.length > 0) {
+    const [r, a] = await Promise.all([
+      supabase.from("ticket_replies").select("id, ticket_id, sender_name, created_at").in("ticket_id", ticketIds),
+      supabase.from("ticket_assist_messages").select("id, ticket_id").in("ticket_id", ticketIds)
+    ]);
+    replies = r.data || [];
+    assists = a.data || [];
+  }
 
   const totalChatsApprox = logs.length;
   const ticketedFromDemo = tickets.filter((t) => (t.tags || []).includes("demo") || true);
@@ -50,7 +61,7 @@ analytics.get("/", async (c) => {
   const aiReplies = replies.filter((r) =>
     String(r.sender_name || "").toLowerCase().includes("ai")
   ).length;
-  const agentAiAdoption = replies.length > 0 ? Math.round((assistRes.data?.length || 0) / Math.max(tickets.length, 1) * 10) : 0;
+  const agentAiAdoption = replies.length > 0 ? Math.round((assists.length || 0) / Math.max(tickets.length, 1) * 10) : 0;
 
   // Topic heatmap — cluster by first word / category via tickets
   const topics: Record<string, number> = {};
@@ -77,7 +88,7 @@ analytics.get("/", async (c) => {
     gapQueries: gapQueries.map((g) => ({ query: g.query, createdAt: g.created_at })),
     avgSearchLatencyMs: avgLatency,
     searchesAnalyzed: totalChatsApprox,
-    aiAssistMessages: assistRes.data?.length || 0,
+    aiAssistMessages: assists.length || 0,
     agentAiAdoptionScore: Math.min(100, agentAiAdoption * 10),
     estimatedCostPerResolution: resolved > 0 ? `$${(0.02 + (avgLatency / 1000) * 0.001).toFixed(3)}` : "n/a",
   });
