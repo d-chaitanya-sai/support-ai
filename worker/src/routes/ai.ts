@@ -289,4 +289,21 @@ Only JSON.`,
   }
 });
 
+// POST /ai/embed
+aiRoutes.post("/embed", async (c) => {
+  try {
+    const { text } = await c.req.json<{ text: string }>();
+    if (!text) return c.json({ error: "Text required" }, 400);
+
+    const response: any = await c.env.AI.run("@cf/baai/bge-base-en-v1.5", {
+      text: [text],
+    });
+
+    return c.json({ embedding: response.data[0] });
+  } catch (error: any) {
+    console.error("Embedding generation failed:", error);
+    return c.json({ error: "Internal server error", details: error.message }, 500);
+  }
+});
+
 export default aiRoutes;

@@ -1,29 +1,6 @@
-import { pipeline, env } from "@xenova/transformers";
 import { NextResponse } from "next/server";
 
-// Ensure we don't use the local cache in serverless environments
-env.useBrowserCache = false;
-env.allowLocalModels = false;
-
-import os from "os";
-try {
-  env.cacheDir = os.tmpdir();
-} catch (e) {}
-
-// Create a singleton pattern to avoid instantiating the pipeline multiple times
-class PipelineSingleton {
-  static task = "feature-extraction";
-  static model = "Xenova/all-MiniLM-L6-v2";
-  static instance: any = null;
-
-  static async getInstance(progress_callback?: Function) {
-    if (this.instance === null) {
-      // @ts-ignore
-      this.instance = pipeline(this.task, this.model, { progress_callback });
-    }
-    return this.instance;
-  }
-}
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
@@ -36,15 +13,21 @@ export async function POST(req: Request) {
       );
     }
 
-    const embedder = await PipelineSingleton.getInstance();
-    
-    // Generate embeddings
-    const output = await embedder(text, { pooling: "mean", normalize: true });
-    
-    // Convert to a regular Array
-    const embeddingArray = Array.from(output.data);
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || "http://localhost:8787";
+    const res = await fetch(`${workerUrl}/ai/embed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
 
-    return NextResponse.json({ embedding: embeddingArray });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("Worker embed failed:", errorText);
+      throw new Error(`Worker returned ${res.status}`);
+    }
+
+    const data = await res.json();
+    return NextResponse.json({ embedding: data.embedding });
   } catch (error: any) {
     console.error("Embedding generation failed:", error);
     return NextResponse.json(
