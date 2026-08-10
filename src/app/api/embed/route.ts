@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 
 // Ensure we don't use the local cache in serverless environments
 env.useBrowserCache = false;
+env.allowLocalModels = false;
+
+import os from "os";
+try {
+  env.cacheDir = os.tmpdir();
+} catch (e) {}
 
 // Create a singleton pattern to avoid instantiating the pipeline multiple times
 class PipelineSingleton {
