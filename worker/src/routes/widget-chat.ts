@@ -142,8 +142,14 @@ widgetChat.post("/", async (c) => {
   let ragContext = "";
   let retrievedChunks: Array<{ content: string; similarity: number; documentTitle: string }> = [];
   try {
-    const embedding = body.query_embedding;
-    if (!embedding) throw new Error("Missing query_embedding");
+    let embedding = body.query_embedding;
+    if (!embedding) {
+      const embedResponse: any = await c.env.AI.run("@cf/baai/bge-base-en-v1.5", {
+        text: [message],
+      });
+      embedding = embedResponse.data[0];
+    }
+    if (!embedding) throw new Error("Failed to generate query_embedding");
 
     let query = supabase.rpc("match_knowledge_chunks", {
       query_embedding: embedding,
