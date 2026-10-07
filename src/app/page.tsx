@@ -64,7 +64,7 @@ export default function Home() {
             <div className="h-8 w-8 bg-primary text-primary-foreground rounded-lg flex items-center justify-center shrink-0">
               <Bot className="h-4 w-4" />
             </div>
-            <span className="font-bold tracking-tight text-[15px]">SupportAI</span>
+            <span className="font-bold tracking-tight text-[15px]">AI E-commerce Support Assistant</span>
           </div>
           {user ? (
             <Button size="sm" onClick={() => router.push("/dashboard")} className="gap-1.5">
@@ -90,14 +90,18 @@ export default function Home() {
 
         {/* Headline */}
         <div className="space-y-3">
-          <h1 className="text-5xl font-bold tracking-tight">SupportAI</h1>
-          <p className="text-muted-foreground text-lg leading-relaxed max-w-md mx-auto">
-            AI-powered support platform with RAG knowledge base, smart tickets, and 10 production AI features.
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">AI E-commerce Support Assistant</h1>
+          <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl mx-auto">
+            Designed an AI-powered conversational assistant for common e-commerce customer-support queries. 
+            Architected the React frontend and Node.js/Express backend to process customer requests and integrated an LLM API to generate contextually relevant responses. 
+            Used AI-assisted development throughout implementation, testing, and iterative improvement.
           </p>
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span className="px-2 py-1 bg-muted rounded-full">Supabase + pgvector</span>
-            <span className="px-2 py-1 bg-muted rounded-full">Cloudflare Workers</span>
-            <span className="px-2 py-1 bg-muted rounded-full">Groq AI</span>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground mt-4">
+            <span className="px-3 py-1 bg-muted rounded-full font-medium">React</span>
+            <span className="px-3 py-1 bg-muted rounded-full font-medium">Node.js</span>
+            <span className="px-3 py-1 bg-muted rounded-full font-medium">Express.js</span>
+            <span className="px-3 py-1 bg-muted rounded-full font-medium">LLM API</span>
+            <span className="px-3 py-1 bg-muted rounded-full font-medium">AI-Assisted Development</span>
           </div>
         </div>
 
@@ -124,7 +128,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="max-w-sm mx-auto bg-card/80 border border-border rounded-2xl p-6 backdrop-blur-sm shadow-xl">
-            <h2 className="text-xl font-bold mb-4">Welcome to SupportAI</h2>
+            <h2 className="text-xl font-bold mb-4">Welcome to AI E-commerce Support Assistant</h2>
             <p className="text-sm text-muted-foreground mb-6">
               Sign in to try RAG chat, smart tickets, and the agent inbox.
             </p>
