@@ -94,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-border gap-2.5 shrink-0">
     
-        <span className="font-bold text-[25px] tracking-tight">Supportai.</span>
+        <span className="font-bold text-[25px] tracking-tight">Support AI.</span>
       </div>
 
       {/* Nav */}
@@ -230,7 +230,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
           <div className="flex items-center gap-2">
      
-            <span className="font-semibold text-sm">SupportAI</span>
+            <span className="font-semibold text-sm">AI E-commerce Support Assistant</span>
           </div>
           <Avatar className="h-8 w-8">
             <AvatarImage src={user.photoUrl} />

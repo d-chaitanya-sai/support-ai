@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SupportAI – AI-Powered Support Platform",
-  description: "RAG-powered knowledge base, smart ticket AI, 10 AI features. Built on Supabase + Cloudflare Workers + Groq.",
+  title: "AI E-commerce Support Assistant – AI-Powered Support Platform",
+  description: "RAG-powered knowledge base, smart ticket AI, 10 AI features. Built on Supabase + Cloudflare Workers + Gemini.",
 };
 
 export default function RootLayout({

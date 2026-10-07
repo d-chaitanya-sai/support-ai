@@ -1,5 +1,5 @@
 /*!
- * SupportAI embed.js
+ * AI E-commerce Support Assistant embed.js
  * Drop this on any site to add a floating AI support chat launcher.
  *
  * Usage:
@@ -14,8 +14,8 @@
 (function () {
   "use strict";
 
-  if (window.__supportAIWidgetLoaded) return;
-  window.__supportAIWidgetLoaded = true;
+  if (window.__EcommerceWidgetLoaded) return;
+  window.__EcommerceWidgetLoaded = true;
 
   function getCurrentScript() {
     if (document.currentScript) return document.currentScript;
@@ -32,7 +32,7 @@
   var widgetId = data.widgetId || data.widgetid;
   if (!widgetId) {
     console.error(
-      "[SupportAI] embed.js is missing required attribute data-widget-id. " +
+      "[AI E-commerce Support Assistant] embed.js is missing required attribute data-widget-id. " +
         'Add it to your <script> tag, e.g. <script src="…/embed.js" data-widget-id="your-id"></script>'
     );
     return;
@@ -52,7 +52,7 @@
   var side = position === "bottom-left" ? "left" : "right";
 
   var style = document.createElement("style");
-  style.setAttribute("data-supportai", "");
+  style.setAttribute("data-ecommerce-widget", "");
   style.textContent =
     "" +
     ".saiw-root, .saiw-root *{box-sizing:border-box;}" +
@@ -157,7 +157,7 @@
   function ensureIframe() {
     if (iframe) return;
     iframe = document.createElement("iframe");
-    iframe.title = "SupportAI Chat";
+    iframe.title = "AI E-commerce Support Assistant Chat";
     iframe.src = baseUrl + "/widgets/p/" + encodeURIComponent(widgetId) + "?embedded=1";
     iframe.allow = "clipboard-write";
     panel.appendChild(iframe);
@@ -191,8 +191,8 @@
   window.addEventListener("message", function (event) {
     var msg = event.data;
     var type = typeof msg === "string" ? msg : msg && msg.type;
-    if (type === "supportai:close") closePanel();
-    if (type === "supportai:open") openPanel();
+    if (type === "AI E-commerce Support Assistant:close") closePanel();
+    if (type === "AI E-commerce Support Assistant:open") openPanel();
   });
 
   function mount() {
@@ -211,7 +211,7 @@
   if (document.body) mount();
   else document.addEventListener("DOMContentLoaded", mount);
 
-  window.SupportAIWidget = {
+  window.EcommerceWidget = {
     open: openPanel,
     close: closePanel,
     toggle: togglePanel,

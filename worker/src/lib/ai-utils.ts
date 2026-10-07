@@ -1,5 +1,5 @@
 import type { Env } from "../index";
-import { getGroq, MODEL } from "./groq";
+import { getGemini, MODEL } from "./gemini";
 
 export interface TicketAnalysis {
   intent: string;
@@ -25,8 +25,8 @@ export interface TicketDraft {
  * Detect language of text
  */
 export async function detectLanguage(env: Env, text: string): Promise<string> {
-  const groq = getGroq(env);
-  const res = await groq.chat.completions.create({
+  const gemini = getGemini(env);
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -49,8 +49,8 @@ export async function analyzeTicket(
   env: Env,
   text: string
 ): Promise<TicketAnalysis> {
-  const groq = getGroq(env);
-  const res = await groq.chat.completions.create({
+  const gemini = getGemini(env);
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -88,8 +88,8 @@ export async function generateTicketDraft(
   env: Env,
   conversation: string
 ): Promise<TicketDraft> {
-  const groq = getGroq(env);
-  const res = await groq.chat.completions.create({
+  const gemini = getGemini(env);
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -151,8 +151,8 @@ export async function translateText(
   targetLanguage: string
 ): Promise<string> {
   if (targetLanguage === "en") return text;
-  const groq = getGroq(env);
-  const res = await groq.chat.completions.create({
+  const gemini = getGemini(env);
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {

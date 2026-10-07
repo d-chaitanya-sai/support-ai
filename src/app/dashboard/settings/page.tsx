@@ -17,7 +17,7 @@ export default function SettingsPage() {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const widgetUrl = user?.widgetId ? `${origin}/widgets/p/${user.widgetId}` : "";
   const embedSnippet = user?.widgetId
-    ? `<!-- SupportAI Widget -->\n<script\n  src="${origin}/embed.js"\n  data-widget-id="${user.widgetId}"\n  async\n></script>`
+    ? `<!-- AI E-commerce Support Assistant Widget -->\n<script\n  src="${origin}/embed.js"\n  data-widget-id="${user.widgetId}"\n  async\n></script>`
     : "";
 
   const copy = async (text: string, label: string) => {
@@ -27,9 +27,9 @@ export default function SettingsPage() {
 
   const loadPreview = () => {
     if (!user?.widgetId) return;
-    const w = window as unknown as { SupportAIWidget?: { open: () => void } };
-    if (w.SupportAIWidget) {
-      w.SupportAIWidget.open();
+    const w = window as unknown as { EcommerceWidget?: { open: () => void } };
+    if (w.EcommerceWidget) {
+      w.EcommerceWidget.open();
       return;
     }
     const script = document.createElement("script");
@@ -37,7 +37,7 @@ export default function SettingsPage() {
     script.setAttribute("data-widget-id", user.widgetId);
     script.async = true;
     script.onload = () => {
-      (window as unknown as { SupportAIWidget?: { open: () => void } }).SupportAIWidget?.open();
+      (window as unknown as { EcommerceWidget?: { open: () => void } }).EcommerceWidget?.open();
     };
     document.body.appendChild(script);
     toast.success("Live widget loaded — try it in the corner");

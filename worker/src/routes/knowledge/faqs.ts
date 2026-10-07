@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
-import { getGroq, MODEL } from "../../lib/groq";
+import { getGemini, MODEL } from "../../lib/gemini";
 
 type Variables = { userId: string };
 const faqs = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -101,9 +101,9 @@ faqs.post("/generate", async (c) => {
     return c.json({ error: "Your knowledge base is empty. Upload documents or add FAQs manually before generating." }, 400);
   }
 
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
   const count = body.count || 10;
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {

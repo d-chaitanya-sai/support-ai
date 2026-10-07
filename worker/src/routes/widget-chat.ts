@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../index";
 import { getSupabase } from "../lib/supabase";
-import { getGroq, MODEL } from "../lib/groq";
+import { getGemini, MODEL } from "../lib/gemini";
 import {
   buildRagContext,
   analyzeTicket,
@@ -10,7 +10,7 @@ import { redactPii, looksLikeJailbreak } from "../lib/pii";
 
 const widgetChat = new Hono<{ Bindings: Env }>();
 
-const SYSTEM_PROMPT = `You are SupportAI, a warm and professional customer support assistant.
+const SYSTEM_PROMPT = `You are AI E-commerce Support Assistant, a warm and professional customer support assistant.
 
 Your goal:
 1. Understand the user's issue with max 2-3 clarifying questions.
@@ -30,244 +30,261 @@ If any of those aren't true — including when you don't have enough knowledge b
 Keep responses concise, friendly, and empathetic. Max 3 paragraphs.`;
 
 widgetChat.post("/", async (c) => {
-  const supabase = getSupabase(c.env);
-  const groq = getGroq(c.env);
-  const start = Date.now();
-
-  const body = await c.req.json<{
-    widgetId: string;
-    message: string;
-    messages: Array<{ role: "user" | "assistant"; content: string }>;
-    collectionIds?: string[];
-    query_embedding?: number[];
-    ticketId?: string;
-  }>();
-
-  const { widgetId, collectionIds, ticketId } = body;
-  let message = body.message || "";
-  const messages = body.messages || [];
-
-  if (!widgetId || !message) {
-    return c.json({ error: "widgetId and message required" }, 400);
-  }
-
-  const { data: owner } = await supabase
-    .from("users")
-    .select("id")
-    .eq("widget_id", widgetId)
-    .single();
-  const widgetUserId = owner?.id;
-  if (!widgetUserId) {
-    return c.json({ error: "Invalid widget ID" }, 400);
-  }
-
-  let currentTicketId = ticketId;
-
-  const now = Date.now();
-  const isNewTicket = !currentTicketId;
-
-  if (isNewTicket) {
-    const safeTitle = redactPii(message).substring(0, 50) + "...";
-    let ownerId = widgetUserId;
-
-    const { data: newTicket } = await supabase
-      .from("tickets")
-      .insert({
-        title: safeTitle,
-        description: redactPii(message),
-        status: "OPEN",
-        priority: "MEDIUM",
-        category: "General",
-        owner_id: ownerId,
-        widget_id: widgetId,
-        created_at: now,
-        updated_at: now,
-      })
-      .select()
-      .single();
-
-    if (newTicket) {
-      currentTicketId = newTicket.id;
-    }
-  }
-
-  if (looksLikeJailbreak(message)) {
-    return c.json({
-      type: "text",
-      message:
-        "I can only help with support questions about our product and policies. How can I assist you with your account or order?",
-      sources: [],
-      language: "en",
-      confidence: "low",
-      latencyMs: Date.now() - start,
-      blocked: true,
-    });
-  }
-
-  message = redactPii(message);
-
-  // 1. Classify the message — language, intent, sentiment, urgency in one call.
-  // This is what drives escalation: urgency/sentiment feed the dashboard's
-  // critical/angry alerting and ticket sort order, so it must run on every
-  // turn (not just once) to catch a customer getting angrier as the chat goes on.
-  const analysis = await analyzeTicket(c.env, message).catch(() => ({
-    intent: "General",
-    sentiment: "neutral" as const,
-    urgency: "low" as const,
-    language: "en",
-  }));
-  const lang = analysis.language || "en";
-  const URGENCY_TO_PRIORITY: Record<string, string> = {
-    critical: "URGENT",
-    high: "HIGH",
-    medium: "MEDIUM",
-    low: "LOW",
-  };
-
-  if (currentTicketId) {
-    await supabase
-      .from("tickets")
-      .update({
-        sentiment: analysis.sentiment,
-        urgency: analysis.urgency,
-        intent: analysis.intent,
-        language: lang,
-        priority: URGENCY_TO_PRIORITY[analysis.urgency] || "MEDIUM",
-        updated_at: now,
-      })
-      .eq("id", currentTicketId);
-  }
-
-  // 2. RAG
-  let ragContext = "";
-  let retrievedChunks: Array<{ content: string; similarity: number; documentTitle: string }> = [];
   try {
-    let embedding = body.query_embedding;
-    if (!embedding) {
-      const embedResponse: any = await c.env.AI.run("@cf/baai/bge-base-en-v1.5", {
-        text: [message],
-      });
-      embedding = embedResponse.data[0];
-    }
-    if (!embedding) throw new Error("Failed to generate query_embedding");
+    const supabase = getSupabase(c.env);
+    const gemini = getGemini(c.env);
+    const start = Date.now();
 
-    let query = supabase.rpc("match_knowledge_chunks", {
-      query_embedding: embedding,
-      match_count: 50,
-      similarity_threshold: 0.2,
-    });
+    const body = await c.req.json<{
+      widgetId: string;
+      message: string;
+      messages: Array<{ role: "user" | "assistant"; content: string }>;
+      collectionIds?: string[];
+      query_embedding?: number[];
+      ticketId?: string;
+    }>();
 
-    if (collectionIds?.length) {
-      query = supabase.rpc("match_knowledge_chunks_filtered", {
-        query_embedding: embedding,
-        match_count: 50,
-        similarity_threshold: 0.2,
-        collection_filter: collectionIds,
-      });
+    const { widgetId, collectionIds, ticketId } = body;
+    let message = body.message || "";
+    const messages = body.messages || [];
+
+    if (!widgetId || !message) {
+      return c.json({ error: "widgetId and message required" }, 400);
     }
 
-    const { data: chunks } = await query;
-    if (chunks?.length) {
-      const { data: allowedChunks } = await supabase
-        .from("knowledge_chunks")
-        .select("id")
-        .eq("user_id", widgetUserId)
-        .in("id", chunks.map((c: any) => c.id));
-        
-      const allowedSet = new Set((allowedChunks || []).map(c => c.id));
-      retrievedChunks = chunks.filter((c: any) => allowedSet.has(c.id)).slice(0, 5);
-      
-      if (retrievedChunks.length > 0) {
-        ragContext = `\n\nCOMPANY KNOWLEDGE BASE:\n${buildRagContext(retrievedChunks)}\n\nUse the above context to answer the user's question when relevant.`;
+    const { data: owner, error: ownerErr } = await supabase
+      .from("users")
+      .select("id")
+      .eq("widget_id", widgetId)
+      .maybeSingle();
+
+    if (ownerErr) {
+      console.error("Owner lookup error:", ownerErr);
+      return c.json({ error: `Database error: ${ownerErr.message}` }, 500);
+    }
+
+    const widgetUserId = owner?.id;
+    if (!widgetUserId) {
+      return c.json({ error: "Invalid widget ID" }, 400);
+    }
+
+    let currentTicketId = ticketId;
+
+    const now = Date.now();
+    const isNewTicket = !currentTicketId;
+
+    if (isNewTicket) {
+      const safeTitle = redactPii(message).substring(0, 50) + "...";
+      let ownerId = widgetUserId;
+
+      const { data: newTicket, error: ticketErr } = await supabase
+        .from("tickets")
+        .insert({
+          title: safeTitle,
+          description: redactPii(message),
+          status: "OPEN",
+          priority: "MEDIUM",
+          category: "General",
+          owner_id: ownerId,
+          widget_id: widgetId,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .maybeSingle();
+
+      if (ticketErr) {
+        console.error("Ticket create error:", ticketErr);
+      }
+
+      if (newTicket) {
+        currentTicketId = newTicket.id;
       }
     }
-  } catch (e) {
-    console.error("RAG failed:", e);
-  }
 
-  const topSim = retrievedChunks[0]?.similarity ?? 0;
-  const confidence: "high" | "medium" | "low" =
-    topSim >= 0.55 ? "high" : topSim >= 0.35 ? "medium" : "low";
-
-  const languageInstruction =
-    lang !== "en"
-      ? `\n\nIMPORTANT: The user writes in language code "${lang}". Always respond in the SAME language.`
-      : "";
-
-  const confidenceNote =
-    confidence === "low"
-      ? "\n\nIf knowledge base match is weak, say you may not have enough information and offer a ticket."
-      : "";
-
-  const systemContent = SYSTEM_PROMPT + ragContext + languageInstruction + confidenceNote;
-
-  const completion = await groq.chat.completions.create({
-    model: MODEL,
-    messages: [
-      { role: "system", content: systemContent },
-      ...messages.map((m) => ({ role: m.role, content: redactPii(m.content) })),
-      { role: "user", content: message },
-    ],
-    temperature: 0.5,
-    max_tokens: 800,
-    stream: false,
-  });
-
-  const raw = completion.choices[0]?.message?.content || "";
-  const nowAfterAI = Date.now();
-
-  let responseType: "text" | "resolved" = "text";
-  
-  let payloadStr = "{}";
-  const payloadMatch = raw.match(/<payload>([\s\S]*?)<\/payload>/);
-  if (payloadMatch) {
-    payloadStr = payloadMatch[1];
-    try {
-      const payloadObj = JSON.parse(payloadStr);
-      await supabase.from("tickets").update({ payload: payloadObj }).eq("id", currentTicketId);
-    } catch (e) {
-      console.error("Failed to parse payload JSON:", e);
+    if (looksLikeJailbreak(message)) {
+      return c.json({
+        type: "text",
+        message:
+          "I can only help with support questions about our product and policies. How can I assist you with your account or order?",
+        sources: [],
+        language: "en",
+        confidence: "low",
+        latencyMs: Date.now() - start,
+        blocked: true,
+      });
     }
-  }
 
-  let cleanContent = raw
-    .replace(/<payload>[\s\S]*?<\/payload>/g, "")
-    .replace("[RESOLVED]", "")
-    .trim();
+    message = redactPii(message);
 
-  // Only honor an AI-claimed resolution when it's actually grounded in a
-  // confident knowledge-base match — otherwise a hallucinated "solved" answer
-  // could close a ticket that genuinely needs a human.
-  if (raw.includes("[RESOLVED]") && confidence !== "low") {
-    responseType = "resolved";
-    await supabase.from("tickets").update({ status: "RESOLVED" }).eq("id", currentTicketId);
-  }
+    // 1. Classify the message — language, intent, sentiment, urgency in one call.
+    const analysis = await analyzeTicket(c.env, message).catch((e) => {
+      console.warn("analyzeTicket fallback:", e);
+      return {
+        intent: "General",
+        sentiment: "neutral" as const,
+        urgency: "low" as const,
+        language: "en",
+      };
+    });
+    const lang = analysis.language || "en";
+    const URGENCY_TO_PRIORITY: Record<string, string> = {
+      critical: "URGENT",
+      high: "HIGH",
+      medium: "MEDIUM",
+      low: "LOW",
+    };
 
-  // Persist this turn
-  await supabase.from("widget_messages").insert([
-    {
-      widget_id: widgetId,
-      role: "user",
-      content: message,
-      original_language: lang,
-      type: "text",
-      ticket_id: currentTicketId,
-      created_at: nowAfterAI,
-    },
-    {
-      widget_id: widgetId,
-      role: "assistant",
-      content: cleanContent,
-      original_language: lang,
-      type: responseType,
-      ticket_id: currentTicketId,
-      created_at: nowAfterAI + 1,
-    },
-  ]);
+    if (currentTicketId) {
+      const { error: ticketUpdateErr } = await supabase
+        .from("tickets")
+        .update({
+          sentiment: analysis.sentiment,
+          urgency: analysis.urgency,
+          intent: analysis.intent,
+          language: lang,
+          priority: URGENCY_TO_PRIORITY[analysis.urgency] || "MEDIUM",
+          updated_at: now,
+        })
+        .eq("id", currentTicketId);
 
-  const elapsed = Date.now() - start;
-  if (retrievedChunks.length > 0) {
-    await supabase.from("knowledge_search_logs").insert({
+      if (ticketUpdateErr) {
+        console.error("Ticket update error:", ticketUpdateErr);
+      }
+    }
+
+    // 2. RAG
+    let ragContext = "";
+    let retrievedChunks: Array<{ content: string; similarity: number; documentTitle: string }> = [];
+    try {
+      let embedding = body.query_embedding;
+      if (!embedding && c.env.AI) {
+        const aiPromise = c.env.AI.run("@cf/baai/bge-base-en-v1.5", {
+          text: [message],
+        });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI embedding timeout")), 3000));
+        
+        const embedResponse: any = await Promise.race([aiPromise, timeoutPromise]).catch((e) => console.warn("AI binding embed error:", e));
+        if (embedResponse?.data?.[0]) {
+          embedding = embedResponse.data[0];
+        }
+      }
+
+      if (embedding) {
+        let query = supabase.rpc("match_knowledge_chunks", {
+          query_embedding: embedding,
+          match_count: 50,
+          similarity_threshold: 0.2,
+        });
+
+        if (collectionIds?.length) {
+          query = supabase.rpc("match_knowledge_chunks_filtered", {
+            query_embedding: embedding,
+            match_count: 50,
+            similarity_threshold: 0.2,
+            collection_filter: collectionIds,
+          });
+        }
+
+        const { data: chunks } = await query;
+        if (chunks?.length) {
+          const { data: allowedChunks } = await supabase
+            .from("knowledge_chunks")
+            .select("id")
+            .eq("user_id", widgetUserId)
+            .in("id", chunks.map((c: any) => c.id));
+            
+          const allowedSet = new Set((allowedChunks || []).map((c: any) => c.id));
+          retrievedChunks = chunks.filter((c: any) => allowedSet.has(c.id)).slice(0, 5);
+          
+          if (retrievedChunks.length > 0) {
+            ragContext = `\n\nCOMPANY KNOWLEDGE BASE:\n${buildRagContext(retrievedChunks)}\n\nUse the above context to answer the user's question when relevant.`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("RAG failed:", e);
+    }
+
+    const topSim = retrievedChunks[0]?.similarity ?? 0;
+    const confidence: "high" | "medium" | "low" =
+      topSim >= 0.55 ? "high" : topSim >= 0.35 ? "medium" : "low";
+
+    const languageInstruction =
+      lang !== "en"
+        ? `\n\nIMPORTANT: The user writes in language code "${lang}". Always respond in the SAME language.`
+        : "";
+
+    const confidenceNote =
+      confidence === "low"
+        ? "\n\nIf knowledge base match is weak, say you may not have enough information and offer a ticket."
+        : "";
+
+    const systemContent = SYSTEM_PROMPT + ragContext + languageInstruction + confidenceNote;
+
+    const completion = await gemini.chat.completions.create({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemContent },
+        ...messages.map((m) => ({ role: m.role, content: redactPii(m.content) })),
+        { role: "user", content: message },
+      ],
+      temperature: 0.5,
+      max_tokens: 800,
+      stream: false,
+    });
+
+    const raw = completion.choices[0]?.message?.content || "";
+    const nowAfterAI = Date.now();
+
+    let responseType: "text" | "resolved" = "text";
+    
+    let payloadStr = "{}";
+    const payloadMatch = raw.match(/<payload>([\s\S]*?)<\/payload>/);
+    if (payloadMatch) {
+      payloadStr = payloadMatch[1];
+      try {
+        const payloadObj = JSON.parse(payloadStr);
+        await supabase.from("tickets").update({ payload: payloadObj }).eq("id", currentTicketId);
+      } catch (e) {
+        console.error("Failed to parse payload JSON:", e);
+      }
+    }
+
+    let cleanContent = raw
+      .replace(/<payload>[\s\S]*?<\/payload>/g, "")
+      .replace("[RESOLVED]", "")
+      .trim();
+
+    if (raw.includes("[RESOLVED]") && confidence !== "low" && currentTicketId) {
+      responseType = "resolved";
+      await supabase.from("tickets").update({ status: "RESOLVED" }).eq("id", currentTicketId);
+    }
+
+    // Persist this turn
+    await supabase.from("widget_messages").insert([
+      {
+        widget_id: widgetId,
+        role: "user",
+        content: message,
+        original_language: lang,
+        type: "text",
+        ticket_id: currentTicketId,
+        created_at: nowAfterAI,
+      },
+      {
+        widget_id: widgetId,
+        role: "assistant",
+        content: cleanContent,
+        original_language: lang,
+        type: responseType,
+        ticket_id: currentTicketId,
+        created_at: nowAfterAI + 1,
+      },
+    ]);
+
+    const elapsed = Date.now() - start;
+    const { error: logErr } = await supabase.from("knowledge_search_logs").insert({
       query: message,
       retrieved_chunks: retrievedChunks.length,
       response_time: elapsed,
@@ -275,35 +292,31 @@ widgetChat.post("/", async (c) => {
       user_id: widgetUserId,
       created_at: nowAfterAI,
     });
-  } else {
-    // Log zero-hit for gap analysis
-    await supabase.from("knowledge_search_logs").insert({
-      query: message,
-      retrieved_chunks: 0,
-      response_time: elapsed,
-      tokens: completion.usage?.total_tokens || 0,
-      user_id: widgetUserId,
-      created_at: nowAfterAI,
+    if (logErr) {
+      console.warn("Search log insert skipped:", logErr);
+    }
+
+    const sources = retrievedChunks.map((ch, i) => ({
+      index: i + 1,
+      documentTitle: ch.documentTitle,
+      similarity: parseFloat((ch.similarity * 100).toFixed(1)),
+      content: ch.content.slice(0, 100) + "...",
+    }));
+
+    return c.json({
+      type: responseType,
+      message: cleanContent,
+      ticketId: currentTicketId,
+      sources,
+      language: lang,
+      confidence,
+      confidenceScore: Math.round(topSim * 100),
+      latencyMs: elapsed,
     });
+  } catch (err: any) {
+    console.error("widgetChat error:", err);
+    return c.json({ error: err.message || "Internal server error" }, 500);
   }
-
-  const sources = retrievedChunks.map((ch, i) => ({
-    index: i + 1,
-    documentTitle: ch.documentTitle,
-    similarity: parseFloat((ch.similarity * 100).toFixed(1)),
-    content: ch.content.slice(0, 100) + "...",
-  }));
-
-  return c.json({
-    type: responseType,
-    message: cleanContent,
-    ticketId: currentTicketId,
-    sources,
-    language: lang,
-    confidence,
-    confidenceScore: Math.round(topSim * 100),
-    latencyMs: elapsed,
-  });
 });
 
 // GET /widget/chat/messages/:widgetId

@@ -19,6 +19,7 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   GROQ_API_KEY: string;
+  GEMINI_API_KEY: string;
 
   // Vars (from wrangler.toml)
   ALLOWED_ORIGIN: string;
@@ -58,7 +59,7 @@ app.use(
 // Auth Middleware
 app.use("*", async (c, next) => {
   // Public routes that don't need user context
-  const publicPaths = ["/", "/health", "/auth/sync-user", "/widget/chat", "/widget/chat/messages", "/widget/chat/tickets", "/widget/chat/poll"];
+  const publicPaths = ["/", "/health", "/auth/sync-user", "/widget/chat", "/widget/chat/messages", "/widget/chat/tickets", "/widget/chat/poll", "/ai/embed"];
   const path = new URL(c.req.url).pathname;
   
   if (publicPaths.some(p => path === p || path.startsWith(p + "/"))) {
@@ -85,7 +86,7 @@ app.use("*", async (c, next) => {
 });
 
 // Health
-app.get("/", (c) => c.json({ status: "ok", service: "SupportAI Worker", version: "1.0.0" }));
+app.get("/", (c) => c.json({ status: "ok", service: "AI E-commerce Support Assistant Worker", version: "1.0.0" }));
 app.get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }));
 
 // Routes

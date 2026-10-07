@@ -12,8 +12,7 @@ ALLOWED_ORIGIN = "*"
 
 [observability]
 enabled = false
-persist = true
-head_sampling_rate = 1
 
 [ai]
 binding = "AI"
+remote = true

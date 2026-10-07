@@ -243,7 +243,7 @@ export function AiChatInterface({ ticket, onSuggestedReply }: AiChatInterfacePro
           </div>
           <div>
             <h3 className="font-semibold text-sm">AI Assistant</h3>
-            <p className="text-xs text-muted-foreground">Saved per ticket · Groq Llama 3.3</p>
+            <p className="text-xs text-muted-foreground">Saved per ticket · Gemini Llama 3.3</p>
           </div>
         </div>
         {hasMessages && lastIsAssistant && !isLoading && (

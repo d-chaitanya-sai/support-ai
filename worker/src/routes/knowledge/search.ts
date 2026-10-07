@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
 import { buildRagContext } from "../../lib/ai-utils";
-import { getGroq, MODEL } from "../../lib/groq";
+import { getGemini, MODEL } from "../../lib/gemini";
 
 type Variables = { userId: string };
 const search = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -75,8 +75,8 @@ ${context}
 
 Question: ${query}`;
 
-    const groq = getGroq(c.env);
-    const res = await groq.chat.completions.create({
+    const gemini = getGemini(c.env);
+    const res = await gemini.chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: finalPrompt }],
       max_tokens: 500,

@@ -187,12 +187,14 @@ export default function WidgetChatPage() {
         .slice(-10)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const embedRes = await fetch("/api/embed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const embedData = await embedRes.json();
+      let queryEmbedding: number[] | undefined = undefined;
+      try {
+        // Skip client-side embedding to prevent long hangs during model download
+        // const { generateClientEmbedding } = await import('@/lib/transformers');
+        // queryEmbedding = await generateClientEmbedding(text);
+      } catch (e) {
+        console.warn("Client embed fetch skipped, falling back to worker embedding:", e);
+      }
 
       const res = await workerFetch("/widget/chat", {
         method: "POST",
@@ -200,10 +202,15 @@ export default function WidgetChatPage() {
           widgetId,
           message: text,
           messages: history,
-          query_embedding: embedData.embedding,
+          query_embedding: queryEmbedding,
           ticketId: ticketId,
         }),
       });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server responded with ${res.status}`);
+      }
 
       const data = await res.json();
       if (data.language) setDetectedLanguage(data.language);
@@ -213,8 +220,6 @@ export default function WidgetChatPage() {
         fetchTicketList();
       }
       if (data.ticketId) setLinkedTicketId(data.ticketId);
-
-
 
       const aiMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -231,8 +236,16 @@ export default function WidgetChatPage() {
 
       if (data.type === "resolved") setShowCsat(true);
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      toast.error("Connection error. Please try again.");
+    } catch (err: any) {
+      console.error("Widget chat error:", err);
+      const errorMsg: ChatMessage = {
+        id: `err-${Date.now()}`,
+        role: "assistant",
+        content: "I'm currently experiencing some technical difficulties and couldn't process your request. Please try again in a moment.",
+        type: "text",
+        createdAt: Date.now() + 1,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }

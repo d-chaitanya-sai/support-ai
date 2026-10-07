@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../../index";
 import { getSupabase } from "../../lib/supabase";
-import { getGroq, MODEL } from "../../lib/groq";
+import { getGemini, MODEL } from "../../lib/gemini";
 
 type Variables = { userId: string };
 const docs = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -98,12 +98,12 @@ docs.post("/", async (c) => {
     const { error: chunkErr } = await supabase.from("knowledge_chunks").insert(chunkInserts);
     if (chunkErr) throw new Error(`Chunk insert failed: ${chunkErr.message}`);
 
-    // 3. Generate AI summary + tags using Groq
+    // 3. Generate AI summary + tags using Gemini
     let aiSummary = "";
     let aiTags: string[] = [];
     try {
-      const groq = getGroq(c.env);
-      const summaryRes = await groq.chat.completions.create({
+      const gemini = getGemini(c.env);
+      const summaryRes = await gemini.chat.completions.create({
         model: MODEL,
         messages: [
           {

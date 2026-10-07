@@ -14,7 +14,7 @@ const FEATURES = [
   { icon: Ticket, title: "Smart Ticket AI", desc: "Auto-detection, intent & sentiment", color: "text-blue-500", bg: "bg-blue-500/10" },
   { icon: BookOpen, title: "FAQ & Document Sync", desc: "AI-generated FAQs from your own knowledge base", color: "text-green-500", bg: "bg-green-500/10" },
   { icon: Globe, title: "Website Crawler", desc: "Import any website automatically", color: "text-orange-500", bg: "bg-orange-500/10" },
-  { icon: Zap, title: "Edge-Native AI", desc: "Cloudflare Workers + Groq LLM", color: "text-yellow-500", bg: "bg-yellow-500/10" },
+  { icon: Zap, title: "Edge-Native AI", desc: "Cloudflare Workers + Gemini LLM", color: "text-yellow-500", bg: "bg-yellow-500/10" },
   { icon: Shield, title: "10 AI Features", desc: "Translation, urgency, summaries", color: "text-pink-500", bg: "bg-pink-500/10" },
 ];
 
@@ -89,21 +89,7 @@ export default function Home() {
         </div>
 
         {/* Headline */}
-        <div className="space-y-3">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">AI E-commerce Support Assistant</h1>
-          <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl mx-auto">
-            Designed an AI-powered conversational assistant for common e-commerce customer-support queries. 
-            Architected the React frontend and Node.js/Express backend to process customer requests and integrated an LLM API to generate contextually relevant responses. 
-            Used AI-assisted development throughout implementation, testing, and iterative improvement.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground mt-4">
-            <span className="px-3 py-1 bg-muted rounded-full font-medium">React</span>
-            <span className="px-3 py-1 bg-muted rounded-full font-medium">Node.js</span>
-            <span className="px-3 py-1 bg-muted rounded-full font-medium">Express.js</span>
-            <span className="px-3 py-1 bg-muted rounded-full font-medium">LLM API</span>
-            <span className="px-3 py-1 bg-muted rounded-full font-medium">AI-Assisted Development</span>
-          </div>
-        </div>
+ 
 
         {/* CTA / Auth Form */}
         {user ? (

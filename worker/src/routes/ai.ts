@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../index";
 import { getSupabase } from "../lib/supabase";
-import { getGroq, MODEL } from "../lib/groq";
+import { getGemini, MODEL } from "../lib/gemini";
 import { translateText } from "../lib/ai-utils";
 
 type Variables = { userId: string };
@@ -10,7 +10,7 @@ const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 // POST /ai/suggest-reply
 aiRoutes.post("/suggest-reply", async (c) => {
   const supabase = getSupabase(c.env);
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
   const body = await c.req.json<{
     ticketId: string;
     tone?: "shorter" | "friendly" | "professional" | "default";
@@ -44,7 +44,7 @@ aiRoutes.post("/suggest-reply", async (c) => {
     .map((r: Record<string, unknown>) => `${r.sender_name as string}: ${r.message as string}`)
     .join("\n");
 
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -87,10 +87,10 @@ ${conversation ? `\nPREVIOUS CONVERSATION:\n${conversation}` : ""}`,
 
 // POST /ai/score-reply — empathy / clarity / policy-risk
 aiRoutes.post("/score-reply", async (c) => {
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
   const { reply, ticketContext } = await c.req.json<{ reply: string; ticketContext?: string }>();
 
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -119,7 +119,7 @@ aiRoutes.post("/score-reply", async (c) => {
 // POST /ai/assist-chat — non-streaming agent copilot for a ticket
 aiRoutes.post("/assist-chat", async (c) => {
   const supabase = getSupabase(c.env);
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
   const body = await c.req.json<{
     ticketId: string;
     message: string;
@@ -148,7 +148,7 @@ aiRoutes.post("/assist-chat", async (c) => {
     ...(replies || []).map((r) => `agent(${r.sender_name}): ${r.message}`),
   ].join("\n");
 
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -189,7 +189,7 @@ ${thread || "(empty)"}`,
 // POST /ai/summarize
 aiRoutes.post("/summarize", async (c) => {
   const supabase = getSupabase(c.env);
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
   const { ticketId } = await c.req.json<{ ticketId: string }>();
 
   const { data: ticket } = await supabase
@@ -211,7 +211,7 @@ aiRoutes.post("/summarize", async (c) => {
     .map((r: Record<string, unknown>) => `[${r.sender_name as string}]: ${r.message as string}`)
     .join("\n");
 
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -260,9 +260,9 @@ aiRoutes.post("/translate", async (c) => {
 // POST /ai/analyze
 aiRoutes.post("/analyze", async (c) => {
   const { text } = await c.req.json<{ text: string }>();
-  const groq = getGroq(c.env);
+  const gemini = getGemini(c.env);
 
-  const res = await groq.chat.completions.create({
+  const res = await gemini.chat.completions.create({
     model: MODEL,
     messages: [
       {

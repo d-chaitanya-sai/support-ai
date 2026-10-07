@@ -19,7 +19,7 @@ export default function IntegrationsPage() {
       return;
     }
     try {
-      localStorage.setItem("supportai_webhook", webhookUrl);
+      localStorage.setItem("AI E-commerce Support Assistant_webhook", webhookUrl);
       toast.success("Webhook endpoint saved");
     } catch {
       toast.error("Could not save");
@@ -39,7 +39,7 @@ export default function IntegrationsPage() {
         body: JSON.stringify({
           event: "ticket.created",
           ticketId: `test-${Date.now()}`,
-          title: "SupportAI test event",
+          title: "AI E-commerce Support Assistant test event",
         }),
         mode: "no-cors",
       });
@@ -57,7 +57,7 @@ export default function IntegrationsPage() {
     <div className="space-y-8 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Integrations</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Connect SupportAI to the tools your team already uses.</p>
+        <p className="text-muted-foreground mt-1 text-sm">Connect AI E-commerce Support Assistant to the tools your team already uses.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">

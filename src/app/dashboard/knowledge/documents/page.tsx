@@ -146,11 +146,16 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      {/* Supported formats */}
-      <div className="flex gap-2 flex-wrap">
-        {["PDF", "DOCX", "TXT", "Markdown", "HTML", "CSV"].map((f) => (
-          <span key={f} className="text-xs px-2 py-1 bg-muted rounded-md text-muted-foreground">{f}</span>
-        ))}
+      {/* Supported formats & notices */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {["DOCX", "TXT", "Markdown", "HTML", "CSV"].map((f) => (
+            <span key={f} className="text-xs px-2 py-1 bg-muted rounded-md text-muted-foreground font-medium">{f}</span>
+          ))}
+        </div>
+        <span className="text-xs px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-md font-medium">
+          ⚠️ PDF not yet available (coming soon)
+        </span>
       </div>
 
       <Card className="border-border/50 bg-card/50">
@@ -161,7 +166,7 @@ export default function DocumentsPage() {
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
               <FileText className="h-12 w-12 opacity-30" />
               <p className="font-medium">No documents yet</p>
-              <p className="text-sm">Upload PDF, DOCX, TXT, Markdown, HTML, or CSV files</p>
+              <p className="text-sm">Upload DOCX, TXT, Markdown, HTML, or CSV files</p>
               <Button variant="outline" onClick={() => fileRef.current?.click()}>Upload first document</Button>
             </div>
           ) : (
